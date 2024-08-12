@@ -1,4 +1,4 @@
-<p align="center" style="margin-top: 120px">
+<p align="center" style="margin-top: 120px"> 
   <h3 align="center">ManagePrompt</h3>
 
   <p align="center">
