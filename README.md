@@ -1,5 +1,5 @@
 <p align="center" style="margin-top: 120px">
-  <h3 align="center">ManagePrompt</h3>
+  <h3 align="center">ManagePrompt</h3> 
 
   <p align="center">
     Launch Your Next AI Project in Hours, Not Months! Our platform handles the technicalities – hosting, security, delivery – so you can focus on the essence of your innovation.
