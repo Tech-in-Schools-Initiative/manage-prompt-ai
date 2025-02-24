@@ -1,9 +1,10 @@
 "use client";
 
-import { ChatBot } from "@prisma/client";
+import type { ChatBot } from "@prisma/client";
+import { PlusCircleIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { notifyError, notifySuccess } from "../../core/toast";
+import { toast } from "sonner";
 import { SaveButton } from "../../form/button";
 import { Button, buttonVariants } from "../../ui/button";
 import { Input } from "../../ui/input";
@@ -14,25 +15,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { PlusCircleIcon } from "@/node_modules/lucide-react";
 
 interface Props {
   chatbot?: ChatBot;
-  action: (data: FormData) => Promise<any>;
+  action: (data: FormData) => Promise<{ error?: string }>;
 }
+
+const itemTypeToFileExtension = {
+  text: ".txt",
+  pdf: ".pdf",
+  csv: ".csv",
+};
 
 export function ChatbotForm({ chatbot, action }: Props) {
   const [model, setModel] = useState("gpt-4o");
-  const [contextItems, setContextItems] = useState<string[]>(
+  const [contextItems, setContextItems] = useState<
+    { type: string; source: string }[]
+  >(
     chatbot?.contextItems
       ? JSON.parse(JSON.stringify(chatbot?.contextItems))
-      : [],
+      : []
   );
 
   return (
@@ -41,9 +43,9 @@ export function ChatbotForm({ chatbot, action }: Props) {
       action={async (data: FormData) => {
         const result = await action(data);
         if (result?.error) {
-          notifyError(result.error);
+          toast.error(result.error);
         } else {
-          notifySuccess("Chatbot created successfully");
+          toast.success("Chatbot created successfully");
         }
       }}
     >
@@ -107,67 +109,120 @@ export function ChatbotForm({ chatbot, action }: Props) {
               Context
             </label>
             <div className="mt-2 sm:col-span-2 sm:mt-0">
-              <input
-                type="hidden"
-                name="context"
-                value={JSON.stringify(contextItems)}
-              />
-              {contextItems.map((item, index) => (
-                <div key={index} className="flex items-center gap-x-4 pb-6">
-                  <Input
-                    type="text"
-                    value={item}
-                    onChange={(e) => {
-                      setContextItems((prev) =>
-                        prev.map((prevItem, i) =>
-                          i === index ? e.target.value : prevItem,
-                        ),
-                      );
-                    }}
-                  />
+              <p className="text-sm text-primary-muted pb-6">
+                Adding context helps the AI provide more accurate and
+                contextually relevant answers by leveraging external data
+                sources. This approach ensures that the responses are better
+                informed and tailored to the specific needs of the conversation.
+              </p>
+
+              {contextItems.map((item, index) => {
+                if (item.type === "html") {
+                  return (
+                    <div
+                      key={`item-${item.source}-${index}`}
+                      className="flex items-center gap-x-4 pb-6"
+                    >
+                      <Input
+                        type="hidden"
+                        name={"contextItemsTypes[]"}
+                        defaultValue={item.type}
+                      />
+                      <Input
+                        type="text"
+                        name={"contextItemsSources[]"}
+                        defaultValue={item.source}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setContextItems((prev) =>
+                            prev.filter((_, i) => i !== index)
+                          );
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  );
+                }
+
+                if (item.type === "pdf" || item.type === "csv") {
+                  return (
+                    <div
+                      key={`item-${item.source}-${index}`}
+                      className="flex items-center gap-x-4 pb-6"
+                    >
+                      <Input
+                        type="hidden"
+                        name={"contextItemsTypes[]"}
+                        defaultValue={item.type}
+                      />
+                      <Input
+                        type="file"
+                        name={"contextItemsSources[]"}
+                        accept={itemTypeToFileExtension[item.type]}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setContextItems((prev) =>
+                            prev.filter((_, i) => i !== index)
+                          );
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  );
+                }
+
+                return null;
+              })}
+
+              <div className="flex space-x-2">
+                {[
+                  {
+                    type: "html",
+                    label: "Webpage",
+                  },
+                  {
+                    type: "pdf",
+                    label: "PDF",
+                  },
+                  {
+                    type: "csv",
+                    label: "CSV",
+                  },
+                ].map(({ type, label }) => (
                   <Button
+                    key={type}
                     type="button"
                     variant="outline"
                     onClick={() => {
-                      setContextItems((prev) =>
-                        prev.filter((_, i) => i !== index),
-                      );
+                      setContextItems((prev) => [
+                        ...prev,
+                        {
+                          type,
+                          source: "",
+                        },
+                      ]);
                     }}
                   >
-                    Remove
-                  </Button>
-                </div>
-              ))}
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button type="button" variant="outline">
                     <PlusCircleIcon className="size-4" />
-                    <span className="ml-2">Add</span>
+                    <span className="ml-2">{label}</span>
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem className="m-0 p-0">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="m-0 p-0 w-full"
-                      onClick={() => {
-                        setContextItems((prev) => [...prev, ""]);
-                      }}
-                    >
-                      Webpage
-                    </Button>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                ))}
+              </div>
             </div>
           </div>
         </div>
 
         <div className="flex items-center justify-end gap-x-6 mt-6">
           <Link
-            href="/console/chatbots"
+            href="/chatbots"
             className={buttonVariants({ variant: "link" })}
             prefetch={false}
           >

@@ -1,24 +1,21 @@
-import { Analytics } from "@vercel/analytics/react";
-import { GeistSans } from "geist/font/sans";
-
 import { ThemeProvider } from "@/components/core/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
 import { SITE_METADATA } from "@/data/marketing";
 import classNames from "classnames";
-import { Bricolage_Grotesque } from "next/font/google";
-
+import { Archivo } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
-
-const bricolageGrotesque = Bricolage_Grotesque({
-  subsets: ["latin"],
-  variable: "--font-bricolage-grotesque",
-});
 
 export const metadata = {
   title: SITE_METADATA.TITLE,
   description: SITE_METADATA.DESCRIPTION,
 };
 
-export const fetchCache = "force-no-store"; // disable cache for console pages
+const archivo = Archivo({
+  subsets: ["latin"],
+});
+
+export const fetchCache = "force-no-store";
 
 export default async function RootLayout({
   children,
@@ -28,11 +25,8 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
-      className={classNames(
-        "flex min-w-full min-h-full",
-        GeistSans.className,
-        bricolageGrotesque.variable
-      )}
+      className={classNames("flex min-w-full min-h-full", archivo.className)}
+      suppressHydrationWarning
     >
       <head>
         <meta
@@ -91,17 +85,27 @@ export default async function RootLayout({
           media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)"
           rel="apple-touch-startup-image"
         />
+        <meta
+          name="theme-color"
+          content="#FFFFFF"
+          media="(prefers-color-scheme: light)"
+        />
+        <meta
+          name="theme-color"
+          content="#020617"
+          media="(prefers-color-scheme: dark)"
+        />
       </head>
 
-      <body
-        className={classNames(
-          "flex-1 min-h-full min-w-full",
-          "rounded-tl-xl rounded-tr-xl md:rounded-none"
-        )}
-      >
+      <body className="flex-1 min-h-full min-w-full">
         <ThemeProvider>{children}</ThemeProvider>
+        <Script
+          strategy="afterInteractive"
+          src="https://analytics.ahrefs.com/analytics.js"
+          data-key="ENZwU7AFoU9yXXczsA6Avw"
+        />
+        <Toaster />
       </body>
-      <Analytics />
     </html>
   );
 }

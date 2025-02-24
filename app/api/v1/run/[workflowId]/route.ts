@@ -1,4 +1,4 @@
-import { modelToProvider, WorkflowInput } from "@/data/workflow";
+import type { WorkflowInput } from "@/data/workflow";
 import { getCompletion } from "@/lib/utils/ai";
 import {
   ErrorCodes,
@@ -6,28 +6,21 @@ import {
   UnauthorizedResponse,
 } from "@/lib/utils/api";
 import { prisma } from "@/lib/utils/db";
-import { getUserKeyFor } from "@/lib/utils/encryption";
 import { validateRateLimit } from "@/lib/utils/ratelimit";
-import {
-  hasExceededSpendLimit,
-  isSubscriptionActive,
-  reportUsage,
-} from "@/lib/utils/stripe";
-import { EventName, logEvent } from "@/lib/utils/tinybird";
 import {
   cacheWorkflowResult,
   getWorkflowCachedResult,
 } from "@/lib/utils/useWorkflow";
-import { waitUntil } from "@vercel/functions";
+import { translateInputs } from "@/lib/utils/workflow";
 import { NextResponse } from "next/server";
-import Stripe from "stripe";
 
 export const maxDuration = 120;
 
 export async function POST(
   req: Request,
-  { params }: { params: { workflowId: string } },
+  props: { params: Promise<{ workflowId: string }> },
 ) {
+  const params = await props.params;
   try {
     const authorization = req.headers.get("authorization");
     if (!authorization) {
@@ -46,7 +39,6 @@ export async function POST(
       include: {
         organization: {
           include: {
-            stripe: true,
             UserKeys: true,
           },
         },
@@ -70,29 +62,11 @@ export async function POST(
 
     // Check if the organization has valid billing
     const organization = key.organization;
-    if (
-      organization?.credits === 0 &&
-      !isSubscriptionActive(organization?.stripe?.subscription)
-    ) {
+    if (organization?.credits === 0) {
       return ErrorResponse(
         "Invalid billing. Please contact support.",
         402,
         ErrorCodes.InvalidBilling,
-      );
-    }
-
-    // Spend limit
-    if (
-      organization?.credits === 0 &&
-      (await hasExceededSpendLimit(
-        organization?.spendLimit,
-        organization?.stripe?.customerId,
-      ))
-    ) {
-      return ErrorResponse(
-        "Spend limit exceeded. Please increase your spend limit to continue using the service.",
-        402,
-        ErrorCodes.SpendLimitReached,
       );
     }
 
@@ -119,23 +93,13 @@ export async function POST(
       });
     }
 
-    let content = workflow.template;
-    const model = workflow.model;
     const inputs = workflow.inputs as unknown as WorkflowInput[];
-    // Handle inputs
-    for (const input of inputs) {
-      if (!body[input.name] || !body[input.name].trim()) {
-        return ErrorResponse(
-          `Missing input: ${input.name}`,
-          400,
-          ErrorCodes.MissingInput,
-        );
-      }
-      content = workflow.template.replace(
-        `{{${input.name}}}`,
-        body[input.name],
-      );
-    }
+    const model = workflow.model;
+    const content = await translateInputs({
+      inputs,
+      inputValues: body,
+      template: workflow.template,
+    });
 
     const response = await getCompletion(
       model,
@@ -144,7 +108,7 @@ export async function POST(
       organization.UserKeys,
     );
 
-    let { result, totalTokenCount } = response;
+    const { result, rawResult, totalTokenCount } = response;
     if (!result) {
       return ErrorResponse(
         "Failed to run workflow",
@@ -153,37 +117,46 @@ export async function POST(
       );
     }
 
-    const isEligibleForByokDiscount = !!getUserKeyFor(
-      modelToProvider[model],
-      organization.UserKeys,
-    );
-    if (isEligibleForByokDiscount) {
-      totalTokenCount = Math.floor(totalTokenCount * 0.3);
-    }
-
-    waitUntil(
-      Promise.all([
-        reportUsage(
-          organization?.id,
-          organization?.stripe?.subscription as unknown as Stripe.Subscription,
+    Promise.all([
+      prisma.workflowRun.create({
+        data: {
+          result,
+          rawRequest: JSON.parse(JSON.stringify({ model, content })),
+          rawResult: JSON.parse(JSON.stringify(rawResult)),
           totalTokenCount,
-        ),
-        logEvent(EventName.RunWorkflow, {
-          workflow_id: workflow.id,
-          owner_id: key.ownerId,
-          model,
-          total_tokens: totalTokenCount,
-        }),
-        workflow.cacheControlTtl
-          ? cacheWorkflowResult(
-              params.workflowId,
-              JSON.stringify(body),
-              result,
-              workflow.cacheControlTtl,
-            )
-          : null,
-      ]),
-    );
+          user: {
+            connect: {
+              id: key.ownerId,
+            },
+          },
+          workflow: {
+            connect: {
+              id: workflow.id,
+            },
+          },
+        },
+      }),
+      prisma.organization.update({
+        where: {
+          id: organization.id,
+        },
+        data: {
+          credits: {
+            decrement: 1,
+          },
+        },
+      }),
+      workflow.cacheControlTtl
+        ? cacheWorkflowResult(
+            params.workflowId,
+            JSON.stringify(body),
+            result,
+            workflow.cacheControlTtl,
+          )
+        : null,
+    ]).catch((error) => {
+      console.error(error);
+    });
 
     return NextResponse.json(
       { success: true, result },

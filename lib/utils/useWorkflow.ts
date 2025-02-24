@@ -1,42 +1,23 @@
 import { prisma } from "@/lib/utils/db";
-import { Prisma, Workflow } from "@prisma/client";
+import type { Prisma, Workflow } from "@prisma/client";
 import { createHash } from "node:crypto";
 import { owner } from "../hooks/useOwner";
 import { redisStore } from "./redis";
 
 export const LIMIT = 25;
 
-export async function getWorkflowById(id: number): Promise<Workflow | null> {
-  const workflow = await prisma.workflow.findUnique({
-    where: {
-      id,
-    },
-  });
-
-  return workflow;
-}
-
 export async function getWorkflowsForOwner({
-  orgId,
-  userId,
+  ownerId,
   search,
   page = 1,
 }: {
-  orgId: string;
-  userId: string;
+  ownerId: string;
   search?: string;
   page?: number;
 }) {
   const dbQuery: Prisma.WorkflowFindManyArgs = {
-    include: {
-      user: true,
-    },
     where: {
-      organization: {
-        id: {
-          equals: orgId ?? userId ?? "",
-        },
-      },
+      ownerId,
     },
     orderBy: {
       createdAt: "desc",
@@ -46,7 +27,7 @@ export async function getWorkflowsForOwner({
   };
 
   if (search) {
-    dbQuery.where!["name"] = {
+    dbQuery.where!.name = {
       search,
     };
   }
@@ -55,11 +36,7 @@ export async function getWorkflowsForOwner({
     prisma.workflow.findMany(dbQuery),
     prisma.workflow.count({
       where: {
-        organization: {
-          id: {
-            equals: orgId ?? userId ?? "",
-          },
-        },
+        ownerId,
       },
     }),
   ]);
@@ -67,7 +44,17 @@ export async function getWorkflowsForOwner({
   return { workflows, count };
 }
 
-export async function getWorkflowAndRuns(id: number, page: number = 1) {
+export async function getWorkflowAndRuns({
+  id,
+  page = 1,
+  skipWorkflowRun = false,
+  branch,
+}: {
+  id: number;
+  page?: number;
+  skipWorkflowRun?: boolean;
+  branch?: string;
+}) {
   const { ownerId } = await owner();
   if (!ownerId) throw new Error("Owner ID not found");
 
@@ -84,30 +71,52 @@ export async function getWorkflowAndRuns(id: number, page: number = 1) {
     },
   });
 
-  if (!workflow) throw new Error("Workflow not found");
+  if (!workflow) {
+    throw new Error("Workflow not found");
+  }
 
-  const [workflowRuns, count] = await prisma.$transaction([
-    prisma.workflowRun.findMany({
-      include: {
-        user: true,
-      },
+  if (branch) {
+    const branchWorkflow = await prisma.workflowBranch.findFirst({
       where: {
+        shortId: branch,
         workflowId: id,
       },
-      orderBy: {
-        createdAt: "desc",
-      },
-      take: LIMIT,
-      skip: (page - 1) * LIMIT,
-    }),
-    prisma.workflowRun.count({
-      where: {
-        workflowId: {
-          equals: id,
-        },
-      },
-    }),
-  ]);
+    });
+
+    if (!branchWorkflow) {
+      throw new Error("Branch workflow not found");
+    }
+
+    workflow.model = branchWorkflow.model;
+    workflow.template = branchWorkflow.template;
+  }
+
+  if (!workflow) throw new Error("Workflow not found");
+
+  const [workflowRuns, count] = skipWorkflowRun
+    ? [[], 0]
+    : await prisma.$transaction([
+        prisma.workflowRun.findMany({
+          include: {
+            user: true,
+          },
+          where: {
+            workflowId: id,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: LIMIT,
+          skip: (page - 1) * LIMIT,
+        }),
+        prisma.workflowRun.count({
+          where: {
+            workflowId: {
+              equals: id,
+            },
+          },
+        }),
+      ]);
 
   return {
     workflow,

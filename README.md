@@ -19,16 +19,6 @@
 
 If you want to learn more about this project or have any questions, send us an email at [hello+manageprompt@techulus.com](mailto:hello+manageprompt@techulus.com)
 
-## Built with 🛠️
-
-- [Next.js](https://nextjs.org/)
-- [Tailwind CSS](https://tailwindcss.com/)
-- [Auth.js](https://authjs.dev)
-- [Fly](https://fly.io/docs/postgres/)
-- [Upstash](https://upstash.com)
-- [tinybird](https://www.tinybird.co)
-- Several AI models and AI services
-
 ## Getting Started 🚀
 
 ### Requirements

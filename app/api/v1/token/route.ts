@@ -1,17 +1,13 @@
-import { prisma } from "@/lib/utils/db";
-import { validateRateLimit } from "@/lib/utils/ratelimit";
-import { redis } from "@/lib/utils/redis";
-import {
-  hasExceededSpendLimit,
-  isSubscriptionActive,
-} from "@/lib/utils/stripe";
-import { createId } from "@paralleldrive/cuid2";
-import { NextRequest, NextResponse } from "next/server";
 import {
   ErrorCodes,
   ErrorResponse,
   UnauthorizedResponse,
 } from "@/lib/utils/api";
+import { prisma } from "@/lib/utils/db";
+import { validateRateLimit } from "@/lib/utils/ratelimit";
+import { redis } from "@/lib/utils/redis";
+import { createId } from "@paralleldrive/cuid2";
+import { type NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -33,14 +29,7 @@ export async function GET(req: NextRequest) {
         key: token,
       },
       include: {
-        organization: {
-          include: {
-            stripe: true,
-          },
-        },
-      },
-      cacheStrategy: {
-        ttl: 300,
+        organization: true,
       },
     });
     if (!key) {
@@ -61,29 +50,11 @@ export async function GET(req: NextRequest) {
 
     // Check if the organization has valid billing
     const organization = key.organization;
-    if (
-      organization?.credits === 0 &&
-      !isSubscriptionActive(organization?.stripe?.subscription)
-    ) {
+    if (organization?.credits === 0) {
       return ErrorResponse(
         "Invalid billing. Please contact support.",
         402,
         ErrorCodes.InvalidBilling,
-      );
-    }
-
-    // Spend limit
-    if (
-      organization?.credits === 0 &&
-      (await hasExceededSpendLimit(
-        organization?.spendLimit,
-        organization?.stripe?.customerId,
-      ))
-    ) {
-      return ErrorResponse(
-        "Spend limit exceeded. Please increase your spend limit to continue using the service.",
-        402,
-        ErrorCodes.SpendLimitReached,
       );
     }
 

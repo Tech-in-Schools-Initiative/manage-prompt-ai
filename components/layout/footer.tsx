@@ -5,7 +5,12 @@ import logo from "../../public/images/logo.png";
 
 const navigation = {
   solutions: [
-    { name: "Workflows", href: "/console/workflows" },
+    { name: "Workflows", href: "/workflows" },
+    { name: "Chatbots", href: "/chatbots" },
+    {
+      name: "Zapier Integration",
+      href: "https://zapier.com/developer/public-invite/217847/c90f089190b5e742f49cbef29910800f/",
+    },
     { name: "Free AI Tools", href: "/ai-tools" },
   ],
   tools: [
@@ -16,22 +21,6 @@ const navigation = {
     {
       name: "Summarise Text",
       href: "/ai-tools/summarise-text",
-    },
-    {
-      name: "Photo Colorizer",
-      href: "/ai-tools/black-and-white-to-color",
-    },
-    {
-      name: "Realistic Image Creator",
-      href: "/ai-tools/photo-realistic-image-creator",
-    },
-    {
-      name: "Image Upscale",
-      href: "/ai-tools/image-upscale",
-    },
-    {
-      name: "Remove Background",
-      href: "/ai-tools/remove-background",
     },
   ],
   project: [
@@ -106,7 +95,7 @@ export function Footer({ isHome = false }: { isHome?: boolean }) {
             <div className="md:grid md:grid-cols-2 md:gap-8">
               <div>
                 <h3 className="text-sm font-semibold leading-6">Solutions</h3>
-                <ul role="list" className="mt-6 space-y-1">
+                <ul className="mt-6 space-y-1">
                   {navigation.solutions.map((item) => (
                     <li key={item.name}>
                       <Link
@@ -124,7 +113,7 @@ export function Footer({ isHome = false }: { isHome?: boolean }) {
                 <h3 className="text-sm font-semibold leading-6">
                   Free AI Tools
                 </h3>
-                <ul role="list" className="mt-6 space-y-1">
+                <ul className="mt-6 space-y-1">
                   {navigation.tools.map((item) => (
                     <li key={item.name}>
                       <Link
@@ -142,7 +131,7 @@ export function Footer({ isHome = false }: { isHome?: boolean }) {
             <div className="md:grid md:grid-cols-2 md:gap-8">
               <div>
                 <h3 className="text-sm font-semibold leading-6">Project</h3>
-                <ul role="list" className="mt-6 space-y-1">
+                <ul className="mt-6 space-y-1">
                   {navigation.project.map((item) => (
                     <li key={item.name}>
                       <Link
@@ -160,7 +149,7 @@ export function Footer({ isHome = false }: { isHome?: boolean }) {
               </div>
               <div className="mt-10 md:mt-0">
                 <h3 className="text-sm font-semibold leading-6">Legal</h3>
-                <ul role="list" className="mt-6 space-y-1">
+                <ul className="mt-6 space-y-1">
                   {navigation.legal.map((item) => (
                     <li key={item.name}>
                       <Link

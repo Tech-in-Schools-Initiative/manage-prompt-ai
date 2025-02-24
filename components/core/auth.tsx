@@ -1,6 +1,9 @@
-import { logout } from "@/app/(auth)/actions";
+"use client";
+import { signOut } from "@/lib/auth-client";
 import { User } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "../ui/button";
 import {
   DropdownMenu,
@@ -12,14 +15,12 @@ import {
 } from "../ui/dropdown-menu";
 
 export const UserButton = () => {
+  const router = useRouter();
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          size="icon"
-          className="overflow-hidden rounded-full"
-        >
+        <Button variant="outline" size="icon" className="overflow-hidden">
           <User className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -27,7 +28,7 @@ export const UserButton = () => {
         <DropdownMenuLabel>My Account</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem>
-          <Link href="/console/settings" className="w-full">
+          <Link href="/settings" className="w-full">
             Settings
           </Link>
         </DropdownMenuItem>
@@ -43,9 +44,21 @@ export const UserButton = () => {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem>
-          <form action={logout}>
-            <button type="submit">Sign Out</button>
-          </form>
+          <button
+            type="button"
+            onClick={() =>
+              toast.promise(
+                signOut().then(() => router.push("/")),
+                {
+                  loading: "Signing out...",
+                  success: "Signed out successfully",
+                  error: "Failed to sign out",
+                },
+              )
+            }
+          >
+            Sign Out
+          </button>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

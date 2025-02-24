@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ReactMarkdown } from "react-markdown/lib/react-markdown";
+import Markdown from "react-markdown";
 import { Spinner } from "./loaders";
 
 export default function StreamingText({
@@ -58,19 +58,19 @@ export default function StreamingText({
     onCompleted?.();
   }, [url, fallbackText, body, onCompleted]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   useEffect(() => {
     if (url) {
       getData();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [url]);
 
   return loading ? (
     <Spinner className={className} />
   ) : renderMarkdown ? (
-    <ReactMarkdown className="prose dark:prose-invert prose-a:text-primary">
+    <Markdown className="prose dark:prose-invert prose-a:text-primary">
       {result}
-    </ReactMarkdown>
+    </Markdown>
   ) : (
     <p className={className}>{result}</p>
   );

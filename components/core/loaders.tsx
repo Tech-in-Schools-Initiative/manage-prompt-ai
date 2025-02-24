@@ -15,7 +15,7 @@ export function Spinner({
       <svg
         className={classnames(
           "animate-spin h-4 w-4 text-black dark:text-white",
-          className
+          className,
         )}
         xmlns="http://www.w3.org/2000/svg"
         fill="none"
@@ -28,12 +28,12 @@ export function Spinner({
           r="10"
           stroke="currentColor"
           strokeWidth="4"
-        ></circle>
+        />
         <path
           className="opacity-75"
           fill="currentColor"
           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-        ></path>
+        />
       </svg>
       {message && <p className="ml-3">{message}</p>}
     </div>
@@ -48,29 +48,35 @@ export function SpinnerWithSpacing() {
   );
 }
 
-export function PageLoading() {
+export function PageLoading({
+  hideHeader = false,
+}: {
+  hideHeader?: boolean;
+}) {
   return (
     <>
-      <PageTitle title="">
-        <div className="-mt-6 flex w-full max-w-6xl flex-col justify-center space-y-2">
-          <Skeleton className="h-[20px] w-[300px] rounded-md" />
-          <Skeleton className="h-[20px] w-[300px] rounded-md" />
-        </div>
-      </PageTitle>
+      {!hideHeader && (
+        <PageTitle title="">
+          <div className="-mt-6 flex w-full max-w-6xl flex-col justify-center space-y-2">
+            <Skeleton className="h-[20px] w-[300px]" />
+            <Skeleton className="h-[20px] w-[300px]" />
+          </div>
+        </PageTitle>
+      )}
 
       <PageSection topInset bottomMargin>
         <div className="flex flex-col space-y-2 p-4">
-          <Skeleton className="h-[20px] w-full rounded-md" />
-          <Skeleton className="h-[20px] w-full rounded-md" />
-          <Skeleton className="h-[20px] w-[124px] rounded-md" />
+          <Skeleton className="h-[20px] w-full" />
+          <Skeleton className="h-[20px] w-full" />
+          <Skeleton className="h-[20px] w-[124px]" />
         </div>
       </PageSection>
 
       <PageSection>
         <div className="flex flex-col space-y-2 p-4">
-          <Skeleton className="h-[20px] w-full rounded-md" />
-          <Skeleton className="h-[20px] w-full rounded-md" />
-          <Skeleton className="h-[20px] w-[124px] rounded-md" />
+          <Skeleton className="h-[20px] w-full" />
+          <Skeleton className="h-[20px] w-full" />
+          <Skeleton className="h-[20px] w-[124px]" />
         </div>
       </PageSection>
     </>

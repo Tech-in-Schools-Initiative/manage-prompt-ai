@@ -1,6 +1,9 @@
+"use client";
+
+import MarkdownView from "@/components/markdown/markdown-view";
 import { DateTime } from "@/lib/utils/datetime";
-import { WorkflowRun } from "@prisma/client";
-import { ReactMarkdown } from "react-markdown/lib/react-markdown";
+import type { WorkflowRun } from "@prisma/client";
+import { GitBranchIcon } from "lucide-react";
 import { Button, buttonVariants } from "../../ui/button";
 import {
   Drawer,
@@ -12,7 +15,7 @@ import {
 } from "../../ui/drawer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs";
 
-type WorkflowRunWithUser = WorkflowRun & {
+export type WorkflowRunWithUser = WorkflowRun & {
   user: {
     name: string | null;
   };
@@ -22,8 +25,9 @@ interface Props {
   workflowRun: WorkflowRunWithUser;
 }
 
-export async function WorkflowRunItem({ workflowRun }: Props) {
-  const { result, user, createdAt, rawRequest, totalTokenCount } = workflowRun;
+export function WorkflowRunItem({ workflowRun }: Props) {
+  const { result, user, createdAt, rawRequest, totalTokenCount, branchId } =
+    workflowRun;
 
   return (
     <li
@@ -34,6 +38,12 @@ export async function WorkflowRunItem({ workflowRun }: Props) {
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold text-gray-900 dark:text-gray-100 space-x-2">
             <span>{user?.name ?? "API"}</span>
+
+            <span aria-hidden="true">&middot;</span>
+            <span className="text-gray-600 dark:text-gray-400 font-normal">
+              <GitBranchIcon className="w-4 h-4 mr-1 inline" />{" "}
+              {branchId ?? "main"}
+            </span>
 
             {totalTokenCount ? (
               <>
@@ -53,9 +63,7 @@ export async function WorkflowRunItem({ workflowRun }: Props) {
         </time>
       </div>
       <div className="mt-1 text-gray-600 dark:text-gray-200">
-        <ReactMarkdown className="prose dark:prose-invert max-w-none prose-a:text-primary">
-          {result}
-        </ReactMarkdown>
+        <MarkdownView content={result} />
       </div>
 
       <Drawer>
@@ -65,7 +73,7 @@ export async function WorkflowRunItem({ workflowRun }: Props) {
           View Raw
         </DrawerTrigger>
         <DrawerContent>
-          <DrawerHeader></DrawerHeader>
+          <DrawerHeader />
 
           <Tabs defaultValue="response">
             <TabsList className="ml-4">
@@ -73,19 +81,19 @@ export async function WorkflowRunItem({ workflowRun }: Props) {
               <TabsTrigger value="request">Request</TabsTrigger>
             </TabsList>
             <TabsContent value="response">
-              <pre className="p-4 bg-secondary overflow-scroll whitespace-pre-wrap">
+              <pre className="p-4 bg-secondary overflow-scroll whitespace-pre-wrap max-h-[320px]">
                 {JSON.stringify(result, null, 2)}
               </pre>
             </TabsContent>
             <TabsContent value="request">
-              <pre className="p-4 bg-secondary overflow-scroll whitespace-pre-wrap">
+              <pre className="p-4 bg-secondary overflow-scroll whitespace-pre-wrap max-h-[320px]">
                 {JSON.stringify(rawRequest, null, 2)}
               </pre>
             </TabsContent>
           </Tabs>
 
           <DrawerFooter>
-            <DrawerClose>
+            <DrawerClose asChild>
               <Button variant="outline" className="mb-6">
                 Close
               </Button>

@@ -3,9 +3,8 @@
 import { FileIcon } from "@radix-ui/react-icons";
 import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { Spinner } from "../../core/loaders";
-import { notifyError } from "../../core/toast";
 import { buttonVariants } from "../../ui/button";
 import {
   Dialog,
@@ -24,7 +23,7 @@ export const ImportWorkflowDialog = () => {
 
     const uploaders = acceptedFiles.map(async (file) => {
       try {
-        return fetch(`/api/workflows/import`, {
+        return fetch("/api/workflows/import", {
           method: "put",
           body: file,
         })
@@ -33,9 +32,9 @@ export const ImportWorkflowDialog = () => {
             if (res?.success) {
               window.location.reload();
             } else {
-              notifyError(
+              toast.error(
                 res?.message ||
-                  "Failed to upload file, please try again or contact support.",
+                  "Failed to upload file, please try again or contact support."
               );
             }
           });
@@ -47,12 +46,11 @@ export const ImportWorkflowDialog = () => {
     });
 
     toast
-      .promise(Promise.all(uploaders), {
+      .promise(Promise.all(uploaders).finally(() => setLoading(false)), {
         loading: "Uploading...",
         success: "Upload completed!",
         error: "Failed to upload file(s)",
       })
-      .finally(() => setLoading(false));
   }, []);
 
   const { getRootProps, getInputProps } = useDropzone({
@@ -81,7 +79,7 @@ export const ImportWorkflowDialog = () => {
             Please provide the JSON file to import the workflow.
             <div
               {...getRootProps()}
-              className="mt-8 flex justify-center rounded-lg border border-dashed border-primary px-6 py-10"
+              className="mt-8 flex justify-center border border-dashed border-primary px-6 py-10"
             >
               {loading ? (
                 <Spinner className="ml-2" message="Importing..." />
@@ -94,7 +92,7 @@ export const ImportWorkflowDialog = () => {
                   <div className="mt-4 flex text-sm leading-6 text-gray-600 dark:text-gray-400">
                     <label
                       htmlFor="file-upload"
-                      className="relative cursor-pointer rounded-md font-semibold text-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 hover:text-primary"
+                      className="relative cursor-pointer font-semibold text-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 hover:text-primary"
                     >
                       <span>Select JSON file</span>
                       <input {...getInputProps()} disabled={loading} />

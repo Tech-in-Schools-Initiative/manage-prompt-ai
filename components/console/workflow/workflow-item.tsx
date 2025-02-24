@@ -1,9 +1,11 @@
+import { Badge } from "@/components/ui/badge";
+import { type AIModel, AIModelToLabel } from "@/data/workflow";
 import { cn } from "@/lib/utils";
-import { ChevronRightIcon } from "@heroicons/react/20/solid";
-import { Workflow } from "@prisma/client";
+import { getWorkflowUsage } from "@/lib/utils/analytics";
+import { prisma } from "@/lib/utils/db";
+import type { Workflow } from "@prisma/client";
 import classNames from "classnames";
-import Link from "next/link";
-import { Badge } from "../../ui/badge";
+import { ChevronRightIcon, TestTube } from "lucide-react";
 
 interface Props {
   workflow: Pick<
@@ -15,69 +17,100 @@ interface Props {
     | "published"
     | "model"
     | "ownerId"
-  > & {
-    user: {
-      name: string;
-    };
-  };
+  >;
 }
 
 export async function WorkflowItem({ workflow }: Props) {
+  const usage = await getWorkflowUsage(workflow.id);
+
+  const tests = await prisma.workflowTest.findMany({
+    select: {
+      status: true,
+    },
+    where: {
+      workflowId: workflow.id,
+    },
+  });
+
+  const areTestsPassing = tests.every((test) => test.status === "pass");
+
   return (
-    <div
-      key={workflow.id}
-      className={cn(
-        "relative flex justify-between space-x-3 rounded-lg border border-gray-200 px-3 py-2 shadow-sm hover:border-gray-400 dark:border-gray-800 dark:hover:border-gray-700 bg-white dark:bg-gray-950",
-      )}
-    >
-      <Link
-        href={`/console/workflows/${workflow.id}`}
-        className="min-w-0 space-y-3"
-        prefetch={false}
-      >
-        <div className="flex items-center space-x-3">
+    <div className="relative flex items-center space-x-4 p-4 bg-seconday bg-white hover:bg-gray-50 dark:bg-gray-950 dark:hover:bg-gray-900">
+      <div className="min-w-0 flex-auto">
+        <div className="flex items-center gap-x-2">
           <span
             className={classNames(
               workflow.published
                 ? "bg-green-100 dark:bg-green-900"
                 : "bg-gray-100 dark:bg-card",
-              "h-4 w-4 flex items-center justify-center rounded-full",
+              "h-4 w-4 flex items-center justify-center",
             )}
             aria-hidden="true"
           >
             <span
               className={classNames(
                 workflow.published ? "bg-green-400" : "bg-red-500",
-                "h-2 w-2 rounded-full",
+                "h-2 w-2",
               )}
             />
           </span>
-
-          <h2 className="text-lg font-semibold">
-            <span className="absolute inset-0" aria-hidden="true" />
-            {workflow.name}{" "}
-            <span className="sr-only">
-              {workflow.published ? "Published" : "Draft"}
-            </span>
-            <div className="flex items-center space-x-2">
-              <Badge variant="outline">{workflow.model}</Badge>
-              <span className="hidden sm:block" aria-hidden="true">
-                &middot;
-              </span>
-              <span className="hidden sm:block text-sm">
-                {workflow.user?.name}
-              </span>
-            </div>
+          <h2 className="min-w-0 font-medium">
+            <a href={`/workflows/${workflow.id}`} className="flex gap-x-2">
+              <span className="truncate">{workflow.name}</span>
+              <span className="absolute inset-0" />
+            </a>
           </h2>
         </div>
-      </Link>
+        <div className="mt-1 ml-6 text-xs md:text-sm flex items-center gap-x-2.5 text-gray-500 dark:text-gray-400">
+          <p className="truncate">
+            {Number(usage?.tokens ?? 0).toLocaleString()} tokens
+          </p>
+          <svg
+            viewBox="0 0 2 2"
+            className="h-0.5 w-0.5 flex-none fill-gray-300"
+          >
+            <circle r={1} cx={1} cy={1} />
+          </svg>
 
-      <div className="sm:hidden">
-        <ChevronRightIcon
-          className="h-4 w-4 text-gray-400"
-          aria-hidden="true"
-        />
+          <p className="whitespace-nowrap">
+            {Number(usage?.runs ?? 0).toLocaleString()} runs
+          </p>
+
+          {tests.length > 0 && (
+            <>
+              <svg
+                viewBox="0 0 2 2"
+                className="h-0.5 w-0.5 flex-none fill-gray-300"
+              >
+                <circle r={1} cx={1} cy={1} />
+              </svg>
+              <p
+                className={cn(
+                  "whitespace-nowrap font-medium inline-flex items-center",
+                  areTestsPassing
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-red-600 dark:text-red-400",
+                )}
+              >
+                <TestTube className="h-4 w-4" />
+                {areTestsPassing ? "Passed" : "Failed"}
+              </p>
+            </>
+          )}
+        </div>
       </div>
+      <Badge
+        variant={
+          AIModelToLabel[workflow.model as AIModel]
+            .toLowerCase()
+            .includes("deprecated")
+            ? "destructive"
+            : "outline"
+        }
+      >
+        {AIModelToLabel[workflow.model as AIModel]}
+      </Badge>
+      <ChevronRightIcon aria-hidden="true" className="h-5 w-5 flex-none" />
     </div>
   );
 }

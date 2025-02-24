@@ -4,10 +4,10 @@ export enum ErrorCodes {
   MissingInput = "missing_input",
   WorkflowNotFound = "workflow_not_found",
   WorkflowRunFailed = "workflow_run_failed",
+  ChatbotNotFound = "chatbot_not_found",
   InvalidBilling = "invalid_billing",
   InternalServerError = "internal_server_error",
   RequestBlocked = "request_blocked",
-  SpendLimitReached = "spend_limit_reached",
 }
 
 export const UnauthorizedResponse = () =>

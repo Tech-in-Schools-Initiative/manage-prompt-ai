@@ -1,4 +1,4 @@
-import { modelToProvider, WorkflowInput } from "@/data/workflow";
+import { type WorkflowInput } from "@/data/workflow";
 import { getStreamingCompletion } from "@/lib/utils/ai";
 import {
   ErrorCodes,
@@ -6,18 +6,14 @@ import {
   UnauthorizedResponse,
 } from "@/lib/utils/api";
 import { prisma } from "@/lib/utils/db";
-import { getUserKeyFor } from "@/lib/utils/encryption";
 import { redis } from "@/lib/utils/redis";
-import { reportUsage } from "@/lib/utils/stripe";
-import { EventName, logEvent } from "@/lib/utils/tinybird";
 import {
   cacheWorkflowResult,
   getWorkflowCachedResult,
 } from "@/lib/utils/useWorkflow";
-import { waitUntil } from "@vercel/functions";
-import { StreamingTextResponse } from "ai";
-import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
+import { translateInputs } from "@/lib/utils/workflow";
+import { createDataStreamResponse } from "ai";
+import { type NextRequest, NextResponse } from "next/server";
 
 export const maxDuration = 120;
 
@@ -36,8 +32,9 @@ export async function OPTIONS() {
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { workflowId: string } },
+  props: { params: Promise<{ workflowId: string }> },
 ) {
+  const params = await props.params;
   const searchParams = req.nextUrl.searchParams;
   const token = searchParams.get("token");
 
@@ -49,24 +46,19 @@ export async function POST(
     const validateToken: { ownerId: string } | null = await redis.get(token);
     if (!validateToken) {
       return UnauthorizedResponse();
-    } else {
-      await redis.del(token);
     }
+    await redis.del(token);
 
     const workflow = await prisma.workflow.findUnique({
       include: {
         organization: {
           include: {
-            stripe: true,
             UserKeys: true,
           },
         },
       },
       where: {
         shortId: params.workflowId,
-      },
-      cacheStrategy: {
-        ttl: 60,
       },
     });
     if (!workflow || !workflow?.published) {
@@ -85,85 +77,66 @@ export async function POST(
     if (cachedResult) {
       const chunks = cachedResult.split(" ");
 
-      const stream = new ReadableStream({
-        async start(controller) {
+      return createDataStreamResponse({
+        status: 200,
+        statusText: "OK",
+        async execute(dataStream) {
           for (const chunk of chunks) {
-            const bytes = new TextEncoder().encode(chunk + " ");
-            controller.enqueue(bytes);
-            await new Promise((r) =>
-              setTimeout(r, Math.floor(Math.random() * 40) + 10),
-            );
+            dataStream.writeData(chunk);
           }
-          controller.close();
         },
       });
-
-      return new StreamingTextResponse(stream);
     }
 
-    let content = workflow.template;
     const model = workflow.model;
     const inputs = workflow.inputs as unknown as WorkflowInput[];
-
-    // Handle inputs
-    for (const input of inputs) {
-      if (!body[input.name] || !body[input.name].trim()) {
-        return ErrorResponse(
-          `Missing input: ${input.name}`,
-          400,
-          ErrorCodes.MissingInput,
-        );
-      }
-      content = workflow.template.replace(
-        `{{${input.name}}}`,
-        body[input.name],
-      );
-    }
-
-    const isEligibleForByokDiscount = !!getUserKeyFor(
-      modelToProvider[model],
-      workflow.organization.UserKeys,
-    );
+    const content = await translateInputs({
+      inputs,
+      inputValues: body,
+      template: workflow.template,
+    });
 
     const onFinish = async (evt: any) => {
       const output = evt.text ?? "";
 
       const inputWordCount = content.split(" ").length;
       const outWordCount = output.split(" ").length;
-      let totalTokens = Math.floor(
-        !isNaN(evt?.usage?.totalTokens)
+      const totalTokens = Math.floor(
+        !Number.isNaN(evt?.usage?.totalTokens)
           ? evt?.usage?.totalTokens
           : (inputWordCount + outWordCount) * 0.6,
       );
 
-      if (isEligibleForByokDiscount) {
-        totalTokens = Math.floor(totalTokens * 0.3);
-      }
-
-      waitUntil(
-        Promise.all([
-          reportUsage(
-            workflow?.organization?.id,
-            workflow?.organization?.stripe
-              ?.subscription as unknown as Stripe.Subscription,
-            totalTokens,
-          ),
-          logEvent(EventName.RunWorkflow, {
-            workflow_id: workflow.id,
-            owner_id: workflow.ownerId,
-            model,
-            total_tokens: totalTokens,
-          }),
-          workflow.cacheControlTtl
-            ? cacheWorkflowResult(
-                params.workflowId,
-                JSON.stringify(body),
-                output,
-                workflow.cacheControlTtl,
-              )
-            : null,
-        ]),
-      );
+      Promise.all([
+        prisma.workflowRun.create({
+          data: {
+            result: output,
+            rawRequest: JSON.parse(JSON.stringify({ model, content })),
+            rawResult: JSON.parse(JSON.stringify({ result: output })),
+            totalTokenCount: totalTokens ?? 0,
+            user: {
+              connect: {
+                id: validateToken.ownerId,
+              },
+            },
+            workflow: {
+              connect: {
+                id: workflow.id,
+              },
+            },
+          },
+        }),
+        workflow.cacheControlTtl
+          ? cacheWorkflowResult(
+              params.workflowId,
+              JSON.stringify(body),
+              output,
+              workflow.cacheControlTtl,
+            )
+          : null,
+      ]).catch((error) => {
+        console.error(error);
+      });
     };
 
     const response = await getStreamingCompletion(

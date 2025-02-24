@@ -1,80 +1,53 @@
 "use client";
 
-import { WorkflowRunStat } from "@/lib/utils/tinybird";
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
+import type { WorkflowRunStat } from "@/lib/utils/analytics";
+import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
 import {
+  type ChartConfig,
   ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
 } from "../../ui/chart";
+
+const chartConfig = {
+  desktop: {
+    label: "Desktop",
+    color: "hsl(var(--chart-3))",
+  },
+} satisfies ChartConfig;
 
 export function WorkflowUsageCharts({
   usageData,
 }: {
   usageData: WorkflowRunStat[];
 }) {
-  const localisedData = usageData.map((data, idx) => {
-    const date = new Date();
-    date.setHours(date.getHours() - (23 - idx));
-    const formattedHourString = date.toLocaleString("en-US", {
-      hour: "numeric",
-      hour12: true,
-    });
-
+  const localisedData = usageData.map((data) => {
     return {
       ...data,
-      hour: formattedHourString,
+      date: new Date(data.date).toDateString(),
     };
   });
 
   return (
     <ChartContainer
-      config={{
-        tokens: {
-          label: "Tokens",
-          color: "hsl(var(--chart-2))",
-        },
-      }}
-      className="aspect-auto h-[280px] w-full"
+      config={chartConfig}
+      className="aspect-auto h-[320px] w-full"
     >
-      <AreaChart data={localisedData}>
-        <defs>
-          <linearGradient id="fillTokens" x1="0" y1="0" x2="0" y2="1">
-            <stop
-              offset="5%"
-              stopColor="var(--color-tokens)"
-              stopOpacity={0.8}
-            />
-            <stop
-              offset="95%"
-              stopColor="var(--color-tokens)"
-              stopOpacity={0.1}
-            />
-          </linearGradient>
-        </defs>
+      <BarChart data={localisedData}>
         <CartesianGrid vertical={false} />
-        <XAxis
-          dataKey="hour"
-          tickLine={false}
-          axisLine={false}
-          tickMargin={8}
-          minTickGap={32}
-        />
+        <XAxis dataKey="date" tickLine tickMargin={10} axisLine />
         <ChartTooltip
           cursor={false}
           content={<ChartTooltipContent indicator="dot" />}
         />
-        <Area
+        <Bar
           dataKey="tokens"
           type="natural"
-          fill="url(#fillTokens)"
+          fill="var(--color-desktop)"
           stroke="var(--color-tokens)"
           stackId="a"
         />
-        <ChartLegend content={<ChartLegendContent />} />
-      </AreaChart>
+      </BarChart>
     </ChartContainer>
   );
 }

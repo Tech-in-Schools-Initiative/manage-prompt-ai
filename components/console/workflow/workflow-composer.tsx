@@ -1,15 +1,15 @@
 "use client";
 
-import { runWorkflow } from "@/app/(dashboard)/console/workflows/actions";
+import { runWorkflow } from "@/app/(dashboard)/workflows/actions";
 import {
-  modelHasInstruction,
-  WorkflowInput,
+  type WorkflowInput,
   WorkflowInputType,
+  modelHasInstruction,
 } from "@/data/workflow";
-import { Workflow } from "@prisma/client";
+import type { Workflow } from "@prisma/client";
 import { useMemo, useReducer } from "react";
+import { toast } from "sonner";
 import { ApiCodeSnippet } from "../../code/snippet";
-import { notifyError } from "../../core/toast";
 import { SaveButton } from "../../form/button";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
@@ -19,9 +19,10 @@ import { Textarea } from "../../ui/textarea";
 interface Props {
   workflow: Workflow;
   apiSecretKey?: string;
+  branch?: string;
 }
 
-export function WorkflowComposer({ workflow, apiSecretKey }: Props) {
+export function WorkflowComposer({ workflow, apiSecretKey, branch }: Props) {
   const { id, template, instruction, model } = workflow;
   const inputs = (workflow.inputs ?? []) as WorkflowInput[];
 
@@ -59,36 +60,40 @@ export function WorkflowComposer({ workflow, apiSecretKey }: Props) {
         action={async (data: FormData) => {
           const result = await runWorkflow(data);
           if (result?.error) {
-            notifyError(result.error as string);
+            toast.error(result.error as string);
           }
         }}
       >
         <input
           type="number"
           name="id"
-          id="id"
           className="hidden"
           defaultValue={Number(id)}
         />
+        {branch ? (
+          <input
+            type="text"
+            name="branch"
+            className="hidden"
+            defaultValue={branch}
+          />
+        ) : null}
         <input
           type="text"
           name="model"
-          id="model"
           className="hidden"
           defaultValue={model!}
         />
         <input
           type="text"
-          name="content"
-          id="content"
+          name="inputs"
           className="hidden"
-          value={generatedTemplate}
+          value={JSON.stringify(inputValues)}
           onChange={() => null}
         />
         <input
           type="text"
           name="instruction"
-          id="instruction"
           className="hidden"
           value={geneatedInstruction}
           onChange={() => null}
@@ -105,13 +110,18 @@ export function WorkflowComposer({ workflow, apiSecretKey }: Props) {
           {inputs?.length ? (
             <TabsContent value="compose">
               <div className="mt-4 space-y-4">
+                <div className="grid w-full items-center gap-1.5">
+                  <Label className="uppercase">MODEL</Label>
+                  <p>{workflow.model}</p>
+                </div>
+
                 {(inputs as WorkflowInput[]).map(
                   ({ name, type = WorkflowInputType.text, label }) => (
                     <div
                       key={name}
                       className="grid w-full items-center gap-1.5"
                     >
-                      <Label>{label ?? name}</Label>
+                      <Label className="uppercase">{label ?? name}</Label>
 
                       {type === WorkflowInputType.textarea ? (
                         <Textarea
@@ -127,10 +137,11 @@ export function WorkflowComposer({ workflow, apiSecretKey }: Props) {
                       {[
                         WorkflowInputType.text,
                         WorkflowInputType.number,
+                        WorkflowInputType.url,
                       ].includes(type) ? (
                         <Input
                           type={type}
-                          placeholder={`Enter value for ${name}`}
+                          placeholder={`Enter ${type}`}
                           value={inputValues[name] ?? ""}
                           onChange={(e) =>
                             updateInput({ [name]: e.target.value })
@@ -138,7 +149,7 @@ export function WorkflowComposer({ workflow, apiSecretKey }: Props) {
                         />
                       ) : null}
                     </div>
-                  ),
+                  )
                 )}
               </div>
 
@@ -202,19 +213,19 @@ export function WorkflowComposer({ workflow, apiSecretKey }: Props) {
                   mimeType: "application/json",
                   text: JSON.stringify(
                     ((inputs ?? []) as WorkflowInput[]).reduce(
-                      (acc, input) => ({
-                        ...acc,
-                        [input.name]: "value",
-                      }),
-                      {},
-                    ),
+                      (acc, input) =>
+                        Object.assign(acc, {
+                          [input.name]: "value",
+                        }),
+                      {}
+                    )
                   ),
                 },
               }}
             />
             <div className="mt-2 text-sm">
               ID:{" "}
-              <span className="p-1 border border-secondary rounded-lg font-mono text-primary bg-secondary">
+              <span className="p-1 border border-secondary font-mono text-primary bg-secondary">
                 {workflow.shortId}
               </span>
             </div>

@@ -31,7 +31,7 @@ export function Header() {
 
           <Link href="/" className="-m-1.5 p-1.5" prefetch={false}>
             <span className="sr-only">ManagePrompt</span>
-            <p className="text-hero relative">
+            <p className="relative">
               Manage<span className="font-semibold">Prompt</span>
             </p>
           </Link>
@@ -51,7 +51,7 @@ export function Header() {
         </div>
         <div className="hidden lg:flex lg:flex-1 lg:justify-end">
           <Link
-            href="/console/workflows"
+            href="/workflows"
             className="text-sm font-semibold leading-6 text-gray-900 dark:text-gray-200"
             prefetch={false}
           >

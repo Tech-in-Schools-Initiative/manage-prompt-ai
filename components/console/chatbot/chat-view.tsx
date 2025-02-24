@@ -1,7 +1,7 @@
 "use client";
 
 import { Spinner, SpinnerWithSpacing } from "@/components/core/loaders";
-import { Badge } from "@/components/ui/badge";
+import MarkdownView from "@/components/markdown/markdown-view";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,19 +12,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { LightningBoltIcon } from "@radix-ui/react-icons";
+import { useDebounce } from "@uidotdev/usehooks";
 import { useChat } from "ai/react";
-import {
-  CommandIcon,
-  CornerDownLeft,
-  Trash2Icon,
-  UserIcon,
-} from "lucide-react";
+import { CornerDownLeft, Trash2Icon, UserIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import toast from "react-hot-toast";
-import { useHotkeys } from "react-hotkeys-hook";
-import { ReactMarkdown } from "react-markdown/lib/react-markdown";
+import { toast } from "sonner";
 
-function ChatView({ token }: { token: string }) {
+function ChatView({ token, isEmbed }: { token: string; isEmbed?: boolean }) {
   const [loading, setLoading] = useState(true);
 
   const {
@@ -38,14 +32,9 @@ function ChatView({ token }: { token: string }) {
   } = useChat({
     api: `/api/v1/chat/${token}/stream`,
     initialInput: "",
-    onFinish: () => {
-      if (window?.scrollTo)
-        window.scrollTo({
-          top: document.body.scrollHeight,
-          behavior: "smooth",
-        });
-    },
   });
+
+  const debouncedMessages = useDebounce(messages, 250);
 
   useEffect(() => {
     setLoading(true);
@@ -59,7 +48,7 @@ function ChatView({ token }: { token: string }) {
 
   const clearChatHistory = useCallback(async () => {
     setMessages([]);
-    await toast.promise(
+     toast.promise(
       fetch(`/api/v1/chat/${token}/history`, {
         method: "DELETE",
       }),
@@ -67,23 +56,17 @@ function ChatView({ token }: { token: string }) {
         loading: "Deleting chat history...",
         success: "Chat history deleted",
         error: "Failed to delete chat history",
-      },
+      }
     );
   }, [token, setMessages]);
 
-  useHotkeys(
-    "ctrl+enter,meta+enter",
-    () => {
-      handleSubmit();
-      setTimeout(() => {
-        setInput("");
-      }, 50);
-    },
-    [handleSubmit, setInput],
-    {
-      enableOnFormTags: ["textarea"],
-    },
-  );
+  useEffect(() => {
+    if (debouncedMessages.length && window?.scrollTo)
+      window.scrollTo({
+        top: document.body.scrollHeight,
+        behavior: "smooth",
+      });
+  }, [debouncedMessages]);
 
   if (loading) {
     return <SpinnerWithSpacing />;
@@ -91,10 +74,7 @@ function ChatView({ token }: { token: string }) {
 
   return (
     <TooltipProvider>
-      <div className="relative flex h-full min-h-[60vh] flex-col rounded-xl bg-muted/50 p-4 lg:col-span-2">
-        <Badge variant="outline" className="absolute right-3 top-3">
-          Output
-        </Badge>
+      <div className="relative flex h-full min-h-[60vh] flex-col bg-muted/50 p-4 lg:col-span-2">
         <div className="flex-1 divide-y-2">
           {messages.map((message) => (
             <div key={message.id} className="flex flex-col py-4">
@@ -109,23 +89,30 @@ function ChatView({ token }: { token: string }) {
                     />
                   )}
                 </div>
-                <ReactMarkdown className="prose dark:prose-invert max-w-none prose-a:text-primary overflow-hidden -mt-[16px]">
-                  {message.content}
-                </ReactMarkdown>
+                <MarkdownView content={message.content} />
               </div>
             </div>
           ))}
         </div>
-        <div className="relative overflow-hidden rounded-lg border bg-background focus-within:ring-1 focus-within:ring-ring mt-6">
+        <div className="sticky bottom-8 overflow-hidden border bg-background focus-within:ring-1 focus-within:ring-ring mt-6">
           <Label htmlFor="message" className="sr-only">
             Message
           </Label>
           <Textarea
             id="message"
-            placeholder="Type your message here..."
+            placeholder="Ask me anything, but please use discretion—I might make mistakes."
             className="min-h-12 resize-none border-0 p-3 shadow-none focus-visible:ring-0"
             value={input}
             onChange={handleInputChange}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit();
+                setTimeout(() => {
+                  setInput("");
+                }, 50);
+              }
+            }}
           />
           <div className="flex items-center p-3 pt-0">
             <Tooltip>
@@ -139,19 +126,34 @@ function ChatView({ token }: { token: string }) {
             </Tooltip>
 
             <form onSubmit={handleSubmit} className="ml-auto gap-1.5">
-              <Button type="submit" size="sm" disabled={isLoading}>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={isLoading}
+                className={isLoading ? "animate-pulse" : ""}
+              >
                 {isLoading ? (
                   <Spinner />
                 ) : (
                   <>
                     Send
-                    <CommandIcon className="size-3.5 ml-2" />
-                    <CornerDownLeft className="size-3.5 ml-1" />
+                    <CornerDownLeft className="hidden lg:block size-3.5 ml-1" />
                   </>
                 )}
               </Button>
             </form>
           </div>
+
+          {isEmbed ? (
+            <a
+              className="text-xs text-hero absolute bottom-2 text-primary left-[50%] transform -translate-x-1/2"
+              target="_blank"
+              rel="noopener noreferrer"
+              href="https://manageprompt.com"
+            >
+              ⚡ by ManagePrompt
+            </a>
+          ) : null}
         </div>
       </div>
     </TooltipProvider>

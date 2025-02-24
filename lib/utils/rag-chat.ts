@@ -1,5 +1,4 @@
-import { decrypt } from "@/lib/utils/encryption";
-import { openai, RAGChat } from "@upstash/rag-chat";
+import { RAGChat, openai } from "@upstash/rag-chat";
 import { Index } from "@upstash/vector";
 
 export const ragChat = new RAGChat({
@@ -11,19 +10,8 @@ export const index = new Index({
   token: process.env.UPSTASH_VECTOR_REST_TOKEN!,
 });
 
-export type ChatBotTokenData = {
+export type ChatBotTokenMetadata = {
   ownerId: string;
   chatbotId: string;
   sessionId: string;
 };
-
-export function decryptChatbotToken(token: string): ChatBotTokenData | null {
-  try {
-    if (!token) return null;
-    const decodedToken = Buffer.from(token, "base64url").toString("utf-8");
-    const decryptedToken = decrypt(JSON.parse(decodedToken));
-    return JSON.parse(decryptedToken);
-  } catch (_) {
-    return null;
-  }
-}

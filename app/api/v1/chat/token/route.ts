@@ -1,14 +1,13 @@
-import { NextRequest } from "next/server";
-import { z } from "@/node_modules/zod";
-import { fromZodError } from "@/node_modules/zod-validation-error";
 import {
   ErrorCodes,
   ErrorResponse,
   UnauthorizedResponse,
 } from "@/lib/utils/api";
 import { prisma } from "@/lib/utils/db";
-import { encrypt } from "@/lib/utils/encryption";
 import { NextResponse } from "@/node_modules/next/server";
+import { z } from "@/node_modules/zod";
+import { fromZodError } from "@/node_modules/zod-validation-error";
+import type { NextRequest } from "next/server";
 
 const ChatTokenRequestSchema = z.object({
   chatbotId: z.string(),
@@ -30,15 +29,11 @@ export async function POST(req: NextRequest) {
     where: {
       key: token,
     },
-    cacheStrategy: {
-      ttl: 300,
-    },
   });
   if (!key) {
     return UnauthorizedResponse();
   }
 
-  const ownerId = key.ownerId;
   const body = await req.json();
   const { chatbotId, sessionId } = body;
 
@@ -55,17 +50,36 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const chatBotToken = encrypt(
-    JSON.stringify({
-      ownerId,
+  const chatbot = await prisma.chatBot.findUnique({
+    where: {
+      id: chatbotId,
+      ownerId: key.ownerId,
+    },
+  });
+  if (!chatbot) {
+    return ErrorResponse("Chatbot not found", 404, ErrorCodes.ChatbotNotFound);
+  }
+
+  const sessionToken = await prisma.chatBotUserSession.findUnique({
+    where: {
+      chatbotId_sessionId: {
+        chatbotId,
+        sessionId,
+      },
+    },
+  });
+
+  if (sessionToken) {
+    return NextResponse.json({ success: true, token: sessionToken.id });
+  }
+
+  const newSessionToken = await prisma.chatBotUserSession.create({
+    data: {
       chatbotId,
       sessionId,
-    }),
-  );
+      ownerId: key.ownerId,
+    },
+  });
 
-  const base64EncodedToken = Buffer.from(JSON.stringify(chatBotToken)).toString(
-    "base64url",
-  );
-
-  return NextResponse.json({ success: true, token: base64EncodedToken });
+  return NextResponse.json({ success: true, token: newSessionToken.id });
 }
